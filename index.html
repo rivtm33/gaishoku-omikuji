@@ -255,6 +255,7 @@ footer{text-align:center;font-size:11px;color:#8e8069;margin-top:36px}
   <div class="btnrow" style="margin-top:10px">
     <button class="sub" id="toggleOdds">当たる確率を見る</button>
     <button class="sub" id="reset">投票をリセット</button>
+    <button class="sub" id="mute">🔊 音あり</button>
   </div>
   <div class="odds" id="odds"></div>
 
@@ -291,6 +292,12 @@ footer{text-align:center;font-size:11px;color:#8e8069;margin-top:36px}
 <div class="conf" id="conf"></div>
 
 <script>
+/* localStorage が使えない環境（プライベートモード等）でも落ちないようにする */
+const store = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+};
+
 /* ============ データ（外食選択肢一覧表より） ============ */
 const SHOPS = [
   {id:"mac",  emo:"🍔", c:"#d8443c", name:"マクドナルド",   genre:"ハンバーガー",       budget:"¥500〜800",    price:1, kids:"キッズメニューあり（おもちゃ付き）", pt:"手軽で早い／新商品が楽しい／ドライブスルーも便利", when:"サクッと済ませたい時"},
@@ -337,16 +344,95 @@ const KICHI = ["大吉","中吉","小吉","末吉","家族吉","満腹吉"];
   }
 })();
 
+/* ============ 音（Web Audio でその場合成・外部ファイルなし） ============ */
+let AC = null;
+let muted = store.get("omikuji-mute") === "1";
+
+function ac(){
+  if(!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+  if(AC.state === "suspended") AC.resume();
+  return AC;
+}
+/* 単音：f→f2 に音程を曲げつつ減衰。vib でビブラート */
+function tone(o){
+  if(muted) return;
+  const c = ac(), t0 = c.currentTime + (o.at || 0), d = o.d;
+  const osc = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter();
+  osc.type = o.type || "square";
+  osc.frequency.setValueAtTime(o.f, t0);
+  if(o.f2) osc.frequency.exponentialRampToValueAtTime(o.f2, t0 + (o.bendT || d));
+  lp.type = "lowpass"; lp.frequency.setValueAtTime(o.cut || 3200, t0);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(o.g || 0.13, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+  osc.connect(lp); lp.connect(g); g.connect(c.destination);
+  osc.start(t0); osc.stop(t0 + d + 0.05);
+  if(o.vib){
+    const lfo = c.createOscillator(), lg = c.createGain();
+    lfo.frequency.value = o.vib; lg.gain.value = o.vibD || 6;
+    lfo.connect(lg); lg.connect(osc.frequency);
+    lfo.start(t0); lfo.stop(t0 + d);
+  }
+}
+/* 太鼓「ドン！」 */
+function taiko(at = 0){
+  if(muted) return;
+  const c = ac(), t0 = c.currentTime + at;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = "sine";
+  o.frequency.setValueAtTime(190, t0);
+  o.frequency.exponentialRampToValueAtTime(46, t0 + 0.22);
+  g.gain.setValueAtTime(0.45, t0);
+  g.gain.exponentialRampToValueAtTime(0.0008, t0 + 0.38);
+  o.connect(g); g.connect(c.destination);
+  o.start(t0); o.stop(t0 + 0.42);
+  const len = Math.floor(c.sampleRate * 0.1);
+  const b = c.createBuffer(1, len, c.sampleRate), dd = b.getChannelData(0);
+  for(let i=0;i<len;i++) dd[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 3);
+  const s = c.createBufferSource(); s.buffer = b;
+  const nf = c.createBiquadFilter(); nf.type = "lowpass"; nf.frequency.value = 1400;
+  const ng = c.createGain(); ng.gain.value = 0.2;
+  s.connect(nf); nf.connect(ng); ng.connect(c.destination);
+  s.start(t0);
+}
+/* くじが回る「でゅっ」…だんだん音程が上がって焦らす */
+const SCALE = [392,440,494,523,587,659,698,784,880,988,1046,1175,1318,1568];
+function dyu(step){
+  const f = SCALE[Math.min(step, SCALE.length - 1)];
+  tone({f:f*0.72, f2:f, bendT:0.045, d:0.10, type:"square", g:0.11, cut:2600});
+}
+/* 当たり「でゅっ・とぅ・る・てゅーーん！」 */
+function fanfare(){
+  taiko(0);
+  tone({f:523.25, f2:587,    bendT:.05, at:.02, d:.13, type:"square", g:.15, cut:4200}); // でゅっ
+  tone({f:659.25, f2:698,    bendT:.05, at:.15, d:.13, type:"square", g:.15, cut:4200}); // とぅ
+  tone({f:783.99, f2:830,    bendT:.05, at:.28, d:.13, type:"square", g:.15, cut:4200}); // る
+  // てゅーーん！（3和音をしゃくり上げてビブラート）
+  [[1046.5,.11],[1318.5,.075],[1568,.055]].forEach(([f,g],i)=>{
+    tone({f:f*0.90, f2:f, bendT:.10, at:.42 + i*0.012, d:1.25, type:"sawtooth", g, cut:5200, vib:6.5, vibD:6});
+  });
+  taiko(.42);
+  // キラキラ余韻
+  [1568,2093,2637,3136].forEach((f,i)=>
+    tone({f, d:.55, at:.62 + i*.085, type:"triangle", g:.055, cut:9000}));
+}
+/* 投票「ぽん」／取り消し「ぽこ」 */
+function pon(on){
+  on ? tone({f:660, f2:990, bendT:.05, d:.14, type:"triangle", g:.13, cut:6000})
+     : tone({f:520, f2:300, bendT:.07, d:.12, type:"triangle", g:.10, cut:3000});
+}
+function updateMuteBtn(){ $("mute").textContent = muted ? "🔇 音なし" : "🔊 音あり"; }
+
 /* ============ 状態 ============ */
 const KEY = "gaishoku-omikuji-v2";
 let votes = {};
 let current = MEMBERS[0].id;
 SHOPS.forEach(s => votes[s.id] = []);
 
-function save(){ localStorage.setItem(KEY, JSON.stringify({d:new Date().toDateString(), v:votes})); }
+function save(){ store.set(KEY, JSON.stringify({d:new Date().toDateString(), v:votes})); }
 function load(){
   try{
-    const o = JSON.parse(localStorage.getItem(KEY));
+    const o = JSON.parse(store.get(KEY));
     if(o && o.d === new Date().toDateString() && o.v)
       SHOPS.forEach(s => { if(Array.isArray(o.v[s.id])) votes[s.id] = o.v[s.id]; });
   }catch(e){}
@@ -433,8 +519,14 @@ $("members").addEventListener("click", e => {
 $("grid").addEventListener("click", e => {
   const el = e.target.closest("[data-s]"); if(!el) return;
   const arr = votes[el.dataset.s], i = arr.indexOf(current);
-  if(i >= 0) arr.splice(i,1); else arr.push(current);
+  if(i >= 0){ arr.splice(i,1); pon(false); } else { arr.push(current); pon(true); }
   renderAll();
+});
+$("mute").addEventListener("click", () => {
+  muted = !muted;
+  store.set("omikuji-mute", muted ? "1" : "0");
+  updateMuteBtn();
+  if(!muted) pon(true);
 });
 $("reset").addEventListener("click", () => {
   if(!confirm("くじを全部出して、投票をリセットします。よろしいですか？")) return;
@@ -483,11 +575,16 @@ function drawLots(){
   $("shaker").classList.add("shaking");
   $("counting").textContent = `筒の中は 全${total}本`;
   $("stage").scrollIntoView({behavior:"smooth", block:"center"});
+  taiko();   // ドン！
 
-  let delay = 60, elapsed = 0;
+  let delay = 60, elapsed = 0, step = 0;
   const roll = () => {
     const s = shopOf(tickets[Math.floor(Math.random()*tickets.length)]);
     $("rolling").textContent = s.emo + " " + s.name;
+    // 前半は速い「でゅでゅでゅ…」、減速につれて音程が上がって焦らす
+    if(elapsed < 1500){ if(step % 3 === 0) dyu(Math.floor(step/3) % 5); }
+    else dyu(4 + Math.round((delay - 60) / 40));
+    step++;
     elapsed += delay;
     if(elapsed > 1500) delay *= 1.28;
     if(delay < 340) rollTimer = setTimeout(roll, delay);
@@ -511,6 +608,7 @@ function finish(w, n, total){
     `<b>おすすめ：</b>${w.pt}<br>` +
     `<b>子ども向け：</b>${w.kids}`;
   $("result").classList.add("show");
+  fanfare();   // でゅっ・とぅ・る・てゅーーん！
   confetti();
 }
 
@@ -535,7 +633,7 @@ $("back").addEventListener("click", () => {
   $("bundles").scrollIntoView({behavior:"smooth", block:"center"});
 });
 
-load(); renderAll();
+load(); renderAll(); updateMuteBtn();
 </script>
 </body>
 </html>
