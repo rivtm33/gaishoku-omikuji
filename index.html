@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>今晩の外食おみくじ｜家族会議</title>
+<style>
+:root{
+  --bg:#fff8ef; --card:#fffdfa; --ink:#3d3229; --sub:#8a7a6b;
+  --line:#e8dccb; --accent:#ef8354; --accent2:#f2b705;
+  --green:#5aa469; --shadow:0 2px 0 rgba(0,0,0,.06),0 8px 24px rgba(120,90,60,.10);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  margin:0;padding:0 14px 60px;background:var(--bg);color:var(--ink);
+  font-family:"Hiragino Maru Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  line-height:1.6;
+}
+h1{font-size:22px;text-align:center;margin:18px 0 4px;letter-spacing:.02em}
+h1 small{display:block;font-size:12px;color:var(--sub);font-weight:normal;margin-top:4px}
+.wrap{max-width:900px;margin:0 auto}
+
+/* ---- ステップ見出し ---- */
+.step{display:flex;align-items:center;gap:8px;margin:26px 0 10px;font-weight:bold;font-size:15px}
+.step i{
+  width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;
+  display:grid;place-items:center;font-size:13px;font-style:normal;flex:0 0 auto
+}
+
+/* ---- メンバー ---- */
+.members{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.member{
+  border:2px solid var(--line);background:var(--card);border-radius:999px;
+  padding:8px 14px;font-size:15px;font-weight:bold;cursor:pointer;
+  display:flex;align-items:center;gap:6px;transition:.15s;box-shadow:var(--shadow)
+}
+.member .cnt{
+  font-size:11px;background:#efe6d8;color:var(--sub);border-radius:999px;
+  padding:1px 7px;font-weight:bold
+}
+.member.on{border-color:var(--accent);background:#fff1e9;transform:translateY(-1px)}
+.member.on .cnt{background:var(--accent);color:#fff}
+.hint{text-align:center;font-size:12.5px;color:var(--sub);margin:8px 0 0}
+
+/* ---- 店カード ---- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:12px}
+.shop{
+  position:relative;background:var(--card);border:2px solid var(--line);border-radius:14px;
+  padding:10px 12px;cursor:pointer;transition:.15s;box-shadow:var(--shadow);overflow:hidden
+}
+.shop:active{transform:scale(.98)}
+.shop.voted{border-color:var(--accent2);background:#fffaea}
+.shop .top{display:flex;align-items:center;gap:8px}
+.shop .emo{font-size:26px;line-height:1}
+.shop .nm{font-weight:bold;font-size:16px}
+.shop .genre{font-size:11.5px;color:var(--sub)}
+.shop .meta{font-size:12px;color:var(--sub);margin-top:6px}
+.shop .pt{font-size:12px;margin-top:4px;color:#6b5c4d}
+.votes{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;min-height:22px}
+.chip{
+  font-size:11px;background:var(--accent);color:#fff;border-radius:999px;
+  padding:2px 8px;font-weight:bold
+}
+.chip.ghost{background:#efe6d8;color:var(--sub)}
+.badge{
+  position:absolute;top:0;right:0;background:var(--accent2);color:#fff;
+  font-size:11px;font-weight:bold;padding:2px 8px;border-bottom-left-radius:10px
+}
+
+/* ---- ボタン ---- */
+.btnrow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+button.act{
+  font-family:inherit;font-weight:bold;font-size:16px;border:none;border-radius:999px;
+  padding:14px 30px;cursor:pointer;color:#fff;background:var(--accent);
+  box-shadow:0 4px 0 #c9663d;transition:.1s
+}
+button.act:active{transform:translateY(3px);box-shadow:0 1px 0 #c9663d}
+button.act:disabled{background:#d6cabb;box-shadow:0 4px 0 #bdb0a0;cursor:not-allowed}
+button.sub{
+  font-family:inherit;font-size:13px;border:2px solid var(--line);background:var(--card);
+  color:var(--sub);border-radius:999px;padding:9px 18px;cursor:pointer;font-weight:bold
+}
+
+/* ---- 確率バー ---- */
+.odds{margin-top:12px;display:none}
+.odds.show{display:block}
+.oddsrow{display:flex;align-items:center;gap:8px;font-size:12.5px;margin:5px 0}
+.oddsrow .l{width:96px;flex:0 0 auto;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar{flex:1;height:12px;background:#efe6d8;border-radius:999px;overflow:hidden}
+.bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:999px;transition:width .4s}
+.oddsrow .r{width:56px;flex:0 0 auto;color:var(--sub);font-weight:bold}
+
+/* ---- おみくじ演出 ---- */
+.stage{
+  display:none;text-align:center;background:var(--card);border:2px solid var(--line);
+  border-radius:18px;padding:24px 16px;margin-top:14px;box-shadow:var(--shadow)
+}
+.stage.show{display:block}
+.tube{font-size:64px;display:inline-block}
+.tube.shake{animation:shake .35s infinite}
+@keyframes shake{
+  0%,100%{transform:rotate(-12deg) translateY(0)}
+  25%{transform:rotate(10deg) translateY(-6px)}
+  50%{transform:rotate(-8deg) translateY(2px)}
+  75%{transform:rotate(12deg) translateY(-4px)}
+}
+.rolling{font-size:26px;font-weight:bold;margin-top:12px;min-height:38px}
+.result{display:none;animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+.result.show{display:block}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+.result .kichi{font-size:15px;color:var(--accent);font-weight:bold;letter-spacing:.3em}
+.result .emo{font-size:70px;line-height:1.1;margin:6px 0}
+.result .nm{font-size:32px;font-weight:bold}
+.result .det{font-size:13.5px;color:var(--sub);margin-top:8px;white-space:pre-line}
+.result .why{
+  font-size:13px;background:#fff5e6;border-radius:12px;padding:10px 12px;
+  margin:14px auto 0;max-width:420px;text-align:left;color:#6b5c4d
+}
+.conf{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:9}
+.conf i{position:absolute;width:9px;height:14px;opacity:0;animation:fall 2.4s linear forwards}
+@keyframes fall{
+  0%{opacity:1;transform:translateY(-40px) rotate(0)}
+  100%{opacity:0;transform:translateY(105vh) rotate(720deg)}
+}
+footer{text-align:center;font-size:11px;color:var(--sub);margin-top:34px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>🎋 今晩の外食おみくじ
+  <small>みんなで投票 → 票の数だけくじを入れて、神様におまかせ！</small>
+</h1>
+
+<div class="step"><i>1</i>だれが投票する？</div>
+<div class="members" id="members"></div>
+<p class="hint">名前を選んでから、下のお店をタップ。<b>何店でも選べます</b>（1人1票じゃなくてOK）</p>
+
+<div class="step"><i>2</i>行きたいお店をタップ</div>
+<div class="grid" id="grid"></div>
+
+<div class="btnrow">
+  <button class="act" id="draw" disabled>くじを引く 🎍</button>
+  <button class="sub" id="toggleOdds">当選確率を見る</button>
+  <button class="sub" id="reset">投票をリセット</button>
+</div>
+<div class="odds" id="odds"></div>
+
+<div class="stage" id="stage">
+  <div id="anim">
+    <div class="tube" id="tube">🎍</div>
+    <div class="rolling" id="rolling">ガラガラ…</div>
+  </div>
+  <div class="result" id="result">
+    <div class="kichi" id="kichi">大　吉</div>
+    <div class="emo" id="rEmo">🍔</div>
+    <div class="nm" id="rName">マクドナルド</div>
+    <div class="det" id="rDet"></div>
+    <div class="why" id="rWhy"></div>
+    <div class="btnrow">
+      <button class="sub" id="again">もう一度引く</button>
+      <button class="sub" id="back">投票にもどる</button>
+    </div>
+  </div>
+</div>
+
+<footer>※価格帯は目安です。店舗や地域によって異なる場合があります。</footer>
+</div>
+<div class="conf" id="conf"></div>
+
+<script>
+/* ============ データ（外食選択肢一覧表より） ============ */
+const SHOPS = [
+  {id:"mac",  emo:"🍔", name:"マクドナルド",   genre:"ハンバーガー",       budget:"¥500〜800",    price:1, kids:"キッズメニューあり（おもちゃ付き）", pt:"手軽で早い／新商品が楽しい／ドライブスルーも便利", when:"サクッと済ませたい時"},
+  {id:"kappa",emo:"🍣", name:"かっぱ寿司",     genre:"回転寿司",           budget:"¥800〜1,200",  price:2, kids:"お子さまメニューあり（デザート付き）", pt:"ネタの種類が豊富／フェアメニューが充実", when:"いろいろ食べたい時"},
+  {id:"hama", emo:"🍤", name:"はま寿司",       genre:"回転寿司",           budget:"¥800〜1,200",  price:2, kids:"はまっこセットあり（おもちゃ付き）", pt:"110円皿が中心／タッチパネルで簡単／期間限定が豊富", when:"コスパよくお寿司を楽しみたい時"},
+  {id:"kura", emo:"🎁", name:"くら寿司",       genre:"回転寿司",           budget:"¥900〜1,300",  price:2, kids:"ビッくらポン！でおもちゃがもらえる", pt:"ビッくらポン！でワクワク／無添加へのこだわり", when:"子どもと一緒に楽しみたい時"},
+  {id:"ohsho",emo:"🥟", name:"餃子の王将",     genre:"中華料理",           budget:"¥800〜1,200",  price:2, kids:"お子さまメニューあり（ラーメン・ごはんなど）", pt:"餃子が人気！ボリューム満点／お持ち帰りもできる", when:"しっかり食べたい時"},
+  {id:"saize",emo:"🍝", name:"サイゼリヤ",     genre:"イタリアン",         budget:"¥600〜1,000",  price:1, kids:"小学生以下のキッズメニューあり", pt:"リーズナブルでコスパ◎／メニューが豊富", when:"安くてゆっくり食事をしたい時"},
+  {id:"bami", emo:"🍜", name:"バーミヤン",     genre:"中華レストラン",     budget:"¥800〜1,200",  price:2, kids:"キッズメニューあり（ラーメン・デザートなど）", pt:"本格中華が楽しめる／ラーメンや炒飯が人気", when:"中華をゆっくり楽しみたい時"},
+  {id:"cocos",emo:"🍳", name:"ココス",         genre:"ファミリーレストラン", budget:"¥800〜1,300", price:2, kids:"おこさまメニューあり（ドリンクバー付きも）", pt:"ハンバーグやステーキが人気／デザートが豊富", when:"家族でゆっくり食事を楽しみたい時"},
+  {id:"goemo",emo:"🍽️", name:"洋麺屋五右衛門", genre:"パスタ",             budget:"¥1,000〜1,500",price:3, kids:"キッズプレートあり（ドリンク付き）", pt:"和風パスタが特徴／おしゃれな雰囲気", when:"ちょっと特別な食事をしたい時"},
+  {id:"sukes",emo:"🍲", name:"資さんうどん",   genre:"うどん",             budget:"¥700〜1,100",  price:2, kids:"お子さまうどんセットあり", pt:"北九州発の人気うどん店／ボリューム満点", when:"うどんが食べたい時"},
+  {id:"azuma",emo:"🥢", name:"生そばあずま",   genre:"そば",               budget:"¥800〜1,200",  price:2, kids:"お子さまメニューあり（うどん・そばなど）", pt:"本格的な生そば／天ぷらや丼セットも人気", when:"そばをゆっくり味わいたい時"}
+];
+const MEMBERS = [
+  {id:"papa",  name:"パパ",    emo:"👨"},
+  {id:"mama",  name:"ママ",    emo:"👩"},
+  {id:"achan", name:"あーちゃん", emo:"🧒"},
+  {id:"kaori", name:"かおり",  emo:"👧"},
+  {id:"asahi", name:"あさひ",  emo:"👦"}
+];
+const KICHI = ["大　吉","中　吉","小　吉","末　吉","家族吉","満腹吉"];
+
+/* ============ 状態 ============ */
+const KEY = "gaishoku-omikuji-v1";
+let votes = {};            // shopId -> [memberId,...]
+let current = MEMBERS[0].id;
+SHOPS.forEach(s=>votes[s.id]=[]);
+
+function save(){
+  localStorage.setItem(KEY, JSON.stringify({d:new Date().toDateString(), v:votes}));
+}
+function load(){
+  try{
+    const o = JSON.parse(localStorage.getItem(KEY));
+    if(o && o.d === new Date().toDateString() && o.v){
+      SHOPS.forEach(s=>{ if(Array.isArray(o.v[s.id])) votes[s.id]=o.v[s.id]; });
+    }
+  }catch(e){}
+}
+
+/* ============ 描画 ============ */
+const $ = id => document.getElementById(id);
+
+function memberName(id){ const m = MEMBERS.find(m=>m.id===id); return m ? m.emo+m.name : id; }
+function countOf(mid){ return SHOPS.reduce((n,s)=>n+(votes[s.id].includes(mid)?1:0),0); }
+function totalVotes(){ return SHOPS.reduce((n,s)=>n+votes[s.id].length,0); }
+
+function renderMembers(){
+  $("members").innerHTML = MEMBERS.map(m=>`
+    <div class="member ${m.id===current?'on':''}" data-m="${m.id}">
+      <span>${m.emo}</span><span>${m.name}</span><span class="cnt">${countOf(m.id)}票</span>
+    </div>`).join("");
+}
+
+function renderShops(){
+  $("grid").innerHTML = SHOPS.map(s=>{
+    const v = votes[s.id];
+    const chips = v.length
+      ? v.map(id=>`<span class="chip">${memberName(id)}</span>`).join("")
+      : `<span class="chip ghost">まだ0票</span>`;
+    return `<div class="shop ${v.includes(current)?'voted':''}" data-s="${s.id}">
+      ${v.length?`<div class="badge">${v.length}票</div>`:""}
+      <div class="top">
+        <div class="emo">${s.emo}</div>
+        <div><div class="nm">${s.name}</div><div class="genre">${s.genre}</div></div>
+      </div>
+      <div class="meta">${s.budget}／1人　${"★".repeat(s.price)}${"☆".repeat(3-s.price)}</div>
+      <div class="pt">${s.pt}</div>
+      <div class="votes">${chips}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderOdds(){
+  const total = totalVotes();
+  const list = SHOPS.map(s=>({s, n:votes[s.id].length}))
+    .filter(x=> total===0 ? true : x.n>0)
+    .sort((a,b)=>b.n-a.n);
+  const denom = total===0 ? SHOPS.length : total;
+  $("odds").innerHTML =
+    `<div class="hint" style="margin-bottom:6px">${
+      total===0 ? "投票が0票なので、全11店が同じ確率です" : `合計 ${total} 票 ＝ くじ ${total} 本`
+    }</div>` +
+    list.map(x=>{
+      const p = (total===0 ? 1 : x.n) / denom * 100;
+      return `<div class="oddsrow">
+        <div class="l">${x.s.emo}${x.s.name}</div>
+        <div class="bar"><span style="width:${p}%"></span></div>
+        <div class="r">${p.toFixed(1)}%</div>
+      </div>`;
+    }).join("");
+}
+
+function renderAll(){
+  renderMembers(); renderShops(); renderOdds();
+  $("draw").disabled = false;
+  save();
+}
+
+/* ============ 操作 ============ */
+$("members").addEventListener("click", e=>{
+  const el = e.target.closest("[data-m]"); if(!el) return;
+  current = el.dataset.m; renderAll();
+});
+$("grid").addEventListener("click", e=>{
+  const el = e.target.closest("[data-s]"); if(!el) return;
+  const arr = votes[el.dataset.s];
+  const i = arr.indexOf(current);
+  if(i>=0) arr.splice(i,1); else arr.push(current);
+  renderAll();
+});
+$("reset").addEventListener("click", ()=>{
+  if(!confirm("投票を全部消します。よろしいですか？")) return;
+  SHOPS.forEach(s=>votes[s.id]=[]); renderAll();
+});
+$("toggleOdds").addEventListener("click", ()=>{
+  const o = $("odds"); o.classList.toggle("show");
+  $("toggleOdds").textContent = o.classList.contains("show") ? "確率を閉じる" : "当選確率を見る";
+});
+
+/* ============ 抽選 ============ */
+function buildTickets(){
+  const t = [];
+  SHOPS.forEach(s=>{
+    const n = votes[s.id].length;
+    for(let i=0;i<n;i++) t.push(s.id);
+  });
+  return t.length ? t : SHOPS.map(s=>s.id);  // 全員0票なら全店1本ずつ
+}
+function pick(tickets){
+  // crypto で偏りのない乱数
+  const a = new Uint32Array(1);
+  crypto.getRandomValues(a);
+  return tickets[a[0] % tickets.length];
+}
+
+let rollTimer = null;
+function drawLots(){
+  const tickets = buildTickets();
+  const winnerId = pick(tickets);
+  const winner = SHOPS.find(s=>s.id===winnerId);
+  const total = tickets.length;
+  const n = votes[winnerId].length;
+
+  $("stage").classList.add("show");
+  $("anim").style.display = "block";
+  $("result").classList.remove("show");
+  $("tube").classList.add("shake");
+  $("stage").scrollIntoView({behavior:"smooth", block:"center"});
+
+  // 名前がガラガラ切り替わって減速 → 当選
+  let delay = 60, elapsed = 0;
+  const roll = ()=>{
+    const s = SHOPS[Math.floor(Math.random()*SHOPS.length)];
+    $("rolling").textContent = s.emo + " " + s.name;
+    elapsed += delay;
+    if(elapsed > 1500) delay *= 1.28;
+    if(delay < 340){ rollTimer = setTimeout(roll, delay); }
+    else { finish(winner, n, total); }
+  };
+  roll();
+}
+
+function finish(w, n, total){
+  $("tube").classList.remove("shake");
+  $("anim").style.display = "none";
+  $("kichi").textContent = KICHI[Math.floor(Math.random()*KICHI.length)];
+  $("rEmo").textContent = w.emo;
+  $("rName").textContent = w.name;
+  const voters = votes[w.id].map(memberName).join("・") || "（投票なし・全店から抽選）";
+  $("rDet").textContent = `${w.genre}／${w.budget}（1人あたり）\n${"★".repeat(w.price)}${"☆".repeat(3-w.price)}　${w.when}`;
+  $("rWhy").innerHTML =
+    `<b>投票したのは：</b>${voters}<br>` +
+    `<b>当選確率：</b>${total}本中 ${n||1}本 ＝ ${((n||1)/total*100).toFixed(1)}%<br>` +
+    `<b>おすすめ：</b>${w.pt}<br>` +
+    `<b>子ども向け：</b>${w.kids}`;
+  $("result").classList.add("show");
+  confetti();
+}
+
+function confetti(){
+  const c = $("conf");
+  const cols = ["#ef8354","#f2b705","#5aa469","#e05a7a","#5b8def"];
+  for(let i=0;i<70;i++){
+    const s = document.createElement("i");
+    s.style.left = Math.random()*100 + "vw";
+    s.style.background = cols[i%cols.length];
+    s.style.animationDelay = (Math.random()*.6) + "s";
+    s.style.animationDuration = (1.8 + Math.random()*1.4) + "s";
+    c.appendChild(s);
+    setTimeout(()=>s.remove(), 4000);
+  }
+}
+
+$("draw").addEventListener("click", drawLots);
+$("again").addEventListener("click", ()=>{ clearTimeout(rollTimer); drawLots(); });
+$("back").addEventListener("click", ()=>{
+  $("stage").classList.remove("show");
+  window.scrollTo({top:0, behavior:"smooth"});
+});
+
+/* ============ 起動 ============ */
+load();
+renderAll();
+</script>
+</body>
+</html>
